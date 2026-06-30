@@ -41,15 +41,38 @@ every push to `main`.
 index.html             reader UI shell
 css/style.css           styles + themes
 js/app.js               app state, navigation, settings, search UI
-js/fetcher.js           CORS-proxy fetch layer + Cloudflare-challenge detection
+js/fetcher.js           proxy-chain fetch layer + Cloudflare-challenge detection
 js/sites/index.js       adapter registry
 js/sites/fanfiction.js  fanfiction.net adapter (parsing + URL building)
+worker/fanfic-proxy.js  optional self-hosted Cloudflare Worker proxy
+worker/README.md        Worker deploy + activation guide
 tests/parser.test.mjs   Playwright-driven tests against real captured markup
 ```
 
 Because GitHub Pages serves static files only, the browser fetches story
 and search pages directly — see §5.1 for why that requires a proxy, and what
 that costs in reliability.
+
+### 3.3 Proxy chain
+
+`fetchHtml()` relays every request through an ordered chain of proxies and
+returns the first usable response:
+
+1. **Self-hosted proxy** (optional, tried first) — set `CUSTOM_PROXY` in
+   `js/fetcher.js` to a deployed `worker/fanfic-proxy.js` URL. A dedicated
+   Worker has a clean-reputation IP and sends real browser-like request
+   headers, both of which the static client cannot do for itself (§5.2), so
+   it is markedly less likely to draw a Cloudflare challenge. It also keeps
+   traffic off third-party proxies entirely (§5.6).
+2. **Public proxies** (zero-setup fallback) — AllOrigins → corsproxy.io →
+   codetabs.com, tried in order. These are the only path when no self-hosted
+   proxy is configured, and remain a fallback when one is.
+
+A proxy that is down, rate-limited, returns a non-2xx, or returns a
+Cloudflare challenge page is treated as failed and the next is tried. There
+is no user-facing proxy picker; the chain is fixed in code and tried
+automatically. `buildProxyChain()` is a pure, unit-tested function so the
+ordering is verified without a live network.
 
 ### 3.1 Site adapters
 
@@ -121,14 +144,15 @@ fanfiction.net-specific logic in it.
   restored on next visit (URL is pre-filled, not auto-loaded).
 
 ### 4.4 Resilience
-- Three public CORS proxies are tried in a fixed order
-  (AllOrigins → corsproxy.io → codetabs.com) with no user-facing picker;
-  a proxy that's down, rate-limited, or returns a Cloudflare challenge page
-  is treated as failed and the next one is tried automatically.
-- If every proxy fails for the same reason (Cloudflare challenge on all
-  three), the error message says so specifically instead of repeating a
-  generic per-proxy failure three times. Mixed failure types still get a
-  per-proxy breakdown.
+- Requests go through the proxy chain described in §3.3 — an optional
+  self-hosted proxy first (when configured), then the public proxies in a
+  fixed order — with no user-facing picker; a proxy that's down,
+  rate-limited, or returns a Cloudflare challenge page is treated as failed
+  and the next one is tried automatically.
+- If every proxy fails for the same reason (Cloudflare challenge on all of
+  them), the error message says so specifically — and points to the
+  self-hosted Worker as the mitigation — instead of repeating a generic
+  per-proxy failure. Mixed failure types still get a per-proxy breakdown.
 
 ## 5. Problems and limitations
 
@@ -137,25 +161,29 @@ were discovered empirically during development (real Cloudflare challenge
 pages, real proxy URL-format quirks) rather than anticipated up front, and
 are recorded here so they aren't rediscovered the same way twice.
 
-### 5.1 The CORS proxy is structural, not incidental
+### 5.1 A proxy is structurally required (but no longer has to be a third party)
 
 fanfiction.net sends no `Access-Control-Allow-Origin` header, so a browser
 on a different origin (`creamcheesebagel.github.io`) cannot fetch it
 directly — this is enforced by the *source server*, not something
-configurable from our side. Every request this app makes is therefore
-relayed through a third-party proxy that:
-- We don't control or operate
-- Can change its URL format without notice (already happened once with
-  codetabs.com mid-project)
-- Can go down, rate-limit, or shut down entirely at any time
-- Sees every URL and search query a user of this app looks at (see §5.6)
+configurable from our side. **Some** proxy is therefore unavoidable for a
+static site; what *is* avoidable is depending on someone else's.
 
-There is no version of this app, short of standing up and maintaining a
-dedicated backend (a Cloudflare Worker, for instance — noted in the README
-as the most reliable long-term option but not built), that removes this
-dependency while staying a free static GitHub Pages site.
+The redesign (§3.3) makes the primary proxy a self-hosted Cloudflare Worker
+(`worker/fanfic-proxy.js`) when `CUSTOM_PROXY` is set. That is still a proxy,
+but it's one the operator controls — no surprise URL-format changes, no
+shared shutdown risk, and it doesn't expose user traffic to a third party
+(§5.6). It runs on Cloudflare's free tier, so it stays a zero-cost static
+deployment with no traditional backend to maintain.
 
-### 5.2 Cloudflare bot protection cannot be defeated client-side
+When `CUSTOM_PROXY` is left empty, the app falls back to **public** proxies,
+which carry the original caveats — they can change URL format without notice
+(codetabs.com already did, mid-project), go down or rate-limit at any time,
+and see every URL and query that passes through them (§5.6). The Worker is
+the fix for all of that; the public proxies remain a zero-setup default and
+a fallback for when the Worker is unreachable.
+
+### 5.2 Cloudflare bot protection can be made less likely, not defeated
 
 fanfiction.net sits behind Cloudflare's managed challenge. Empirically,
 this triggers more often on `/search/` than on individual `/s/...` story
@@ -166,21 +194,32 @@ so far).
 
 This was investigated directly: a real same-origin browser request to
 fanfiction.net (with session cookies, browser-enforced `Sec-Fetch-*`
-headers reflecting genuine navigation) succeeds where our proxied,
+headers reflecting genuine navigation) succeeds where a proxied,
 cross-origin, credential-less request to the same endpoint gets challenged.
-That gap **cannot be closed from this codebase**:
+The static client itself **cannot** close that gap:
 - `Sec-Fetch-*` headers are forbidden headers — a browser sets them from
   real navigation context and JS cannot override them.
-- `credentials: include` on a fetch to a third-party proxy only ever
-  attaches that proxy's own cookies, never the source site's, because
-  cookies are domain-scoped.
-- The actual outbound request to fanfiction.net is made server-side by the
-  proxy, not by this app — we don't control its headers either.
+- `credentials: include` on a fetch to a proxy only ever attaches that
+  proxy's own cookies, never the source site's, because cookies are
+  domain-scoped.
+- The actual outbound request to fanfiction.net is made by the proxy, not
+  by this app.
 
-The current behavior (§4.4) gets a different proxy's IP a chance to dodge
-the challenge, and gives a clear, specific error when all three are
-blocked. It does not, and structurally cannot, guarantee search (or any
-fetch) will succeed.
+The redesign attacks the two factors that *do* move the odds, by shifting
+the outbound request to a self-hosted Worker (§3.3): a **dedicated,
+clean-reputation IP** instead of a public proxy's heavily-abused shared
+pool, and **real browser-like headers** (`User-Agent`, `Accept`,
+`Accept-Language`) set server-side where the static client can't. In
+practice this is what most often determines whether Cloudflare waves a
+request through.
+
+What it still cannot do: **solve** a challenge once issued. If Cloudflare
+decides to present a managed JS challenge, a Worker fetch receives the same
+"Just a moment…" interstitial, the app detects it (`isCloudflareChallenge`),
+and reports it clearly. So the realistic guarantee is "much more likely to
+succeed, especially for search," not "always succeeds." Defeating an issued
+challenge would require a headless browser solving the JS proof-of-work —
+out of scope for a free static site and its lightweight Worker.
 
 ### 5.3 Parsing is coupled to fanfiction.net's exact markup
 
@@ -220,11 +259,19 @@ repeatable tests.
 
 ### 5.6 Privacy
 
-Every story URL and search keyword a user enters passes through a
-third-party proxy operator (currently AllOrigins, corsproxy.io, or
-codetabs.com) that this project has no relationship with and no control
-over. There is no privacy policy, no control over what these operators log
-or retain, and no way to audit it from here.
+When the app falls back to **public** proxies, every story URL and search
+keyword a user enters passes through a third-party operator (AllOrigins,
+corsproxy.io, or codetabs.com) that this project has no relationship with
+and no control over — no privacy policy, no insight into logging or
+retention, no way to audit it from here.
+
+Configuring the self-hosted Worker (§3.3) removes the third party for the
+primary path: traffic goes through infrastructure the operator runs and can
+inspect or log on their own terms. It does **not** make requests anonymous
+to fanfiction.net itself (the Worker's IP and headers reach the source), and
+it doesn't help when the Worker is unreachable and the app falls back to
+public proxies. So it's a real privacy improvement for the common case, not
+end-to-end anonymity.
 
 ### 5.7 Content fidelity
 
