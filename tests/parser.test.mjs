@@ -164,6 +164,59 @@ checks.push(
   ["cloudflare: real search results not flagged", cloudflareChecks.search === false]
 );
 
+// fetchHtml's proxy-aggregation error messages, exercised via mocked network
+// responses (no real internet access in this environment, and these
+// branches aren't reachable through the DOM-fixture tests above).
+await page.route("**allorigins.win**", (route) =>
+  route.fulfill({ status: 200, contentType: "text/html", body: cloudflareFixture })
+);
+await page.route("**corsproxy.io**", (route) =>
+  route.fulfill({ status: 200, contentType: "text/html", body: cloudflareFixture })
+);
+await page.route("**codetabs.com**", (route) =>
+  route.fulfill({ status: 200, contentType: "text/html", body: cloudflareFixture })
+);
+
+const allChallengedMessage = await page.evaluate(async () => {
+  const { fetchHtml } = await import("/js/fetcher.js");
+  try {
+    await fetchHtml("https://www.fanfiction.net/search/?keywords=test&ready=1&type=story");
+    return null;
+  } catch (err) {
+    return err.message;
+  }
+});
+checks.push([
+  "fetchHtml: all-proxies-challenged gives one clear message",
+  /blocking every available proxy/.test(allChallengedMessage || ""),
+]);
+
+// Now make AllOrigins fail a different way (HTTP 500) while the other two
+// stay challenged - this isn't a uniform Cloudflare block, so the generic
+// per-proxy aggregated message should be used instead of the single
+// "every proxy challenged" message.
+await page.route("**allorigins.win**", (route) =>
+  route.fulfill({ status: 500, contentType: "text/html", body: "server error" })
+);
+const mixedMessage = await page.evaluate(async () => {
+  const { fetchHtml } = await import("/js/fetcher.js");
+  try {
+    await fetchHtml("https://www.fanfiction.net/search/?keywords=test&ready=1&type=story");
+    return null;
+  } catch (err) {
+    return err.message;
+  }
+});
+checks.push([
+  "fetchHtml: mixed failures give per-proxy aggregated message",
+  /AllOrigins: HTTP 500/.test(mixedMessage || "") &&
+    /corsproxy\.io: blocked by a Cloudflare/.test(mixedMessage || ""),
+]);
+
+await page.unroute("**allorigins.win**");
+await page.unroute("**corsproxy.io**");
+await page.unroute("**codetabs.com**");
+
 let ok = true;
 for (const [name, pass] of checks) {
   console.log(`${pass ? "PASS" : "FAIL"} ${name}`);
