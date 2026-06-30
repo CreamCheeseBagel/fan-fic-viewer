@@ -19,6 +19,10 @@ const searchFixture = readFileSync(
   join(root, "tests/fixtures/fanfiction-search-results.html"),
   "utf8"
 );
+const cloudflareFixture = readFileSync(
+  join(root, "tests/fixtures/cloudflare-challenge.html"),
+  "utf8"
+);
 
 const TYPES = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css" };
 
@@ -116,6 +120,25 @@ checks.push(
       "A SatAM-based fanfic detailing Bunnie's partial roboticization - and Antoine's resulting feelings of guilt.",
   ],
   ["search: meta captured separately", searchResults[1]?.meta.startsWith("Sonic the Hedgehog - Rated: K+")]
+);
+
+// Cloudflare interstitial detection: a real "Just a moment..." page must be
+// flagged, while real content (chapter or search results) must not be.
+const cloudflareChecks = await page.evaluate(
+  async ({ challenge, chapter, search }) => {
+    const { isCloudflareChallenge } = await import("/js/fetcher.js");
+    return {
+      challenge: isCloudflareChallenge(challenge),
+      chapter: isCloudflareChallenge(chapter),
+      search: isCloudflareChallenge(search),
+    };
+  },
+  { challenge: cloudflareFixture, chapter: realFixture, search: searchFixture }
+);
+checks.push(
+  ["cloudflare: challenge page detected", cloudflareChecks.challenge === true],
+  ["cloudflare: real chapter not flagged", cloudflareChecks.chapter === false],
+  ["cloudflare: real search results not flagged", cloudflareChecks.search === false]
 );
 
 let ok = true;
