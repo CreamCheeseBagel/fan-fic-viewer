@@ -15,13 +15,18 @@ const realFixture = readFileSync(
   join(root, "tests/fixtures/fanfiction-real-chapter.html"),
   "utf8"
 );
+const searchFixture = readFileSync(
+  join(root, "tests/fixtures/fanfiction-search-results.html"),
+  "utf8"
+);
 
 const TYPES = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css" };
 
 const server = createServer((req, res) => {
   try {
-    const path = join(root, decodeURIComponent(req.url.split("?")[0]));
-    const body = readFileSync(path === root ? join(root, "index.html") : path);
+    const reqPath = decodeURIComponent(req.url.split("?")[0]);
+    const path = reqPath === "/" ? join(root, "index.html") : join(root, reqPath);
+    const body = readFileSync(path);
     res.writeHead(200, { "Content-Type": TYPES[extname(path)] || "text/plain" });
     res.end(body);
   } catch {
@@ -88,6 +93,29 @@ checks.push(
   ["real: chapterCount", rm.chapterCount === 5],
   ["real: chapter parsed from url", realResult.info.chapter === 4],
   ["real: story text extracted", /Travelling with the Doctor/.test(rm.chapterHtml)]
+);
+
+// Real fanfiction.net search-results markup: confirms .z-padtop2 (not
+// .z-padtop) holds the metadata line, and that a highlighted match wrapped
+// onto its own line ("<b>Rabbot</b>\n  Tale") still extracts as one title.
+const searchResults = await page.evaluate(async (html) => {
+  const { searchAdapters, toDocument } = await import("/js/sites/index.js");
+  const adapter = searchAdapters()[0];
+  return adapter.parseSearchResults(toDocument(html));
+}, searchFixture);
+
+checks.push(
+  ["search: result count", searchResults.length === 2],
+  ["search: inline-highlight title", searchResults[0]?.title === "MEGATRON VS THE RABBOT"],
+  ["search: wrapped-highlight title", searchResults[1]?.title === "Rabbot Tale"],
+  ["search: author", searchResults[1]?.author === "bunnikkila"],
+  ["search: url resolved absolute", searchResults[1]?.url === "https://www.fanfiction.net/s/4913618/1/Rabbot-Tale"],
+  [
+    "search: summary excludes meta line",
+    searchResults[1]?.summary ===
+      "A SatAM-based fanfic detailing Bunnie's partial roboticization - and Antoine's resulting feelings of guilt.",
+  ],
+  ["search: meta captured separately", searchResults[1]?.meta.startsWith("Sonic the Hedgehog - Rated: K+")]
 );
 
 let ok = true;

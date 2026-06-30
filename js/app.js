@@ -1,5 +1,5 @@
 import { fetchHtml, PROXIES } from "./fetcher.js";
-import { adapterFor, toDocument } from "./sites/index.js";
+import { adapterFor, searchAdapters, toDocument } from "./sites/index.js";
 
 const SETTINGS_KEY = "ffv:settings";
 const LAST_URL_KEY = "ffv:lastUrl";
@@ -17,6 +17,7 @@ const els = {
   loadBtn: document.getElementById("load-btn"),
   intro: document.getElementById("intro"),
   status: document.getElementById("status"),
+  searchResults: document.getElementById("search-results"),
   story: document.getElementById("story"),
   title: document.getElementById("story-title"),
   author: document.getElementById("story-author"),
@@ -96,6 +97,7 @@ async function loadStory(url) {
 
   els.story.hidden = true;
   els.intro.hidden = true;
+  els.searchResults.hidden = true;
   els.loadBtn.disabled = true;
   showStatus(`<span class="spinner"></span>Loading story…`);
 
@@ -121,6 +123,101 @@ async function loadStory(url) {
   } finally {
     els.loadBtn.disabled = false;
   }
+}
+
+// --- search ------------------------------------------------------------
+let activeSearch = null; // { adapter, keywords, page }
+
+async function runSearch(keywords) {
+  const adapters = searchAdapters();
+  if (!adapters.length) {
+    showStatus("Search isn't supported yet.", true);
+    return;
+  }
+  const adapter = adapters[0];
+
+  els.story.hidden = true;
+  els.intro.hidden = true;
+  els.searchResults.hidden = true;
+  els.searchResults.innerHTML = "";
+  els.loadBtn.disabled = true;
+  showStatus(`<span class="spinner"></span>Searching…`);
+
+  activeSearch = { adapter, keywords, page: 1 };
+
+  try {
+    await loadSearchPage();
+    hideStatus();
+  } catch (err) {
+    showStatus(escapeHtml(err.message), true);
+  } finally {
+    els.loadBtn.disabled = false;
+  }
+}
+
+async function loadSearchPage() {
+  const { adapter, keywords, page } = activeSearch;
+  const html = await fetchHtml(adapter.searchUrl(keywords, page), settings.proxy);
+  const doc = toDocument(html);
+  const results = adapter.parseSearchResults(doc);
+  renderSearchResults(results, page === 1);
+}
+
+function renderSearchResults(results, replace) {
+  if (replace) els.searchResults.innerHTML = "";
+
+  let list = els.searchResults.querySelector(".result-list");
+  if (!list) {
+    list = document.createElement("div");
+    list.className = "result-list";
+    els.searchResults.appendChild(list);
+  }
+
+  if (replace && !results.length) {
+    const empty = document.createElement("p");
+    empty.className = "muted";
+    empty.textContent = "No results found.";
+    els.searchResults.appendChild(empty);
+  }
+
+  for (const r of results) {
+    const card = document.createElement("a");
+    card.className = "result-card";
+    card.href = r.url;
+    card.innerHTML = `
+      <h3>${escapeHtml(r.title)}</h3>
+      <p class="muted small">${escapeHtml(r.author)}</p>
+      ${r.summary ? `<p class="result-summary">${escapeHtml(r.summary)}</p>` : ""}
+      ${r.meta ? `<p class="muted small">${escapeHtml(r.meta)}</p>` : ""}
+    `;
+    card.addEventListener("click", (e) => {
+      e.preventDefault();
+      loadStory(r.url);
+    });
+    list.appendChild(card);
+  }
+
+  const oldMore = els.searchResults.querySelector(".load-more");
+  if (oldMore) oldMore.remove();
+  if (results.length) {
+    const more = document.createElement("button");
+    more.type = "button";
+    more.className = "load-more";
+    more.textContent = "Load more results";
+    more.addEventListener("click", async () => {
+      more.disabled = true;
+      more.textContent = "Loading…";
+      activeSearch.page += 1;
+      try {
+        await loadSearchPage();
+      } catch (err) {
+        showStatus(escapeHtml(err.message), true);
+      }
+    });
+    els.searchResults.appendChild(more);
+  }
+
+  els.searchResults.hidden = false;
 }
 
 function renderStoryShell() {
@@ -175,9 +272,23 @@ function updateNavButtons(n) {
 
 els.form.addEventListener("submit", (e) => {
   e.preventDefault();
-  const url = els.urlInput.value.trim();
-  if (url) loadStory(url);
+  const value = els.urlInput.value.trim();
+  if (!value) return;
+  if (isUrl(value)) {
+    loadStory(value);
+  } else {
+    runSearch(value);
+  }
 });
+
+function isUrl(value) {
+  try {
+    new URL(value);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 function goPrev() { if (current) showChapter((current.info.chapter || 1) - 1); }
 function goNext() { if (current) showChapter((current.info.chapter || 1) + 1); }

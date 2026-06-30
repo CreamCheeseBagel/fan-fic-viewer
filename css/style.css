@@ -137,6 +137,22 @@ code {
 }
 .status.error { border-color: #c0392b; color: #c0392b; }
 
+.search-results { padding: 16px 0 32px; }
+.result-list { display: flex; flex-direction: column; gap: 16px; }
+.result-card {
+  display: block;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--fg);
+  text-decoration: none;
+}
+.result-card:hover { border-color: var(--accent); }
+.result-card h3 { margin: 0 0 4px; font-size: 17px; }
+.result-summary { margin: 8px 0 4px; }
+.load-more { display: block; margin: 16px auto 0; }
+
 .story { padding: 32px 0 64px; }
 .story-meta h1 { font-size: 26px; margin-bottom: 4px; }
 .summary { font-style: italic; margin-top: 12px; }

@@ -25,6 +25,52 @@ export const fanfictionAdapter = {
     return `https://www.fanfiction.net/s/${info.storyId}/${n}${slug}`;
   },
 
+  // fanfiction.net's own pagination JS builds `&ppage=N` (not `&page=N`).
+  searchUrl(keywords, page = 1) {
+    const params = new URLSearchParams({ keywords, ready: "1", type: "story" });
+    if (page > 1) params.set("ppage", String(page));
+    return `https://www.fanfiction.net/search/?${params.toString()}`;
+  },
+
+  // Search results are a list of `.z-list` blocks, each with a `.stitle`
+  // title link (text may wrap a <b>highlighted match</b> across lines), an
+  // unclassed author link, and a `.z-indent.z-padtop` block holding the
+  // summary text followed by a nested `.z-padtop2` metadata line (rating,
+  // chapters, words, updated/published dates, etc).
+  parseSearchResults(doc) {
+    return Array.from(doc.querySelectorAll(".z-list"))
+      .map((node) => {
+        const titleLink = node.querySelector("a.stitle");
+        const href = titleLink ? titleLink.getAttribute("href") : "";
+
+        const authorLink = Array.from(node.querySelectorAll("a")).find((a) =>
+          /\/u\/\d+/.test(a.getAttribute("href") || "")
+        );
+
+        const indent = node.querySelector(".z-indent");
+        let summary = "";
+        let meta = "";
+        if (indent) {
+          const clone = indent.cloneNode(true);
+          const metaEl = clone.querySelector(".z-padtop2");
+          if (metaEl) {
+            meta = text(metaEl);
+            metaEl.remove();
+          }
+          summary = text(clone);
+        }
+
+        return {
+          title: text(titleLink),
+          author: text(authorLink),
+          summary,
+          meta,
+          url: href ? new URL(href, "https://www.fanfiction.net").href : "",
+        };
+      })
+      .filter((r) => r.title && r.url);
+  },
+
   parse(doc, info) {
     const top = doc.querySelector("#profile_top");
 
@@ -85,7 +131,7 @@ function safeHost(url) {
 }
 
 function text(el) {
-  return el ? el.textContent.trim() : "";
+  return el ? el.textContent.replace(/\s+/g, " ").trim() : "";
 }
 
 const ALLOWED = new Set([
