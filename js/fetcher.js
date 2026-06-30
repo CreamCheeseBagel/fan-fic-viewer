@@ -1,3 +1,10 @@
+// Fetching helpers for a static (no-backend) site.
+//
+// fanfiction.net does not send CORS headers, so the browser cannot fetch it
+// directly. We route requests through a public CORS proxy. Proxies come and go
+// and may be rate-limited or blocked by the source's bot protection, so the
+// proxy is user-selectable in settings.
+
 export const PROXIES = [
   {
     id: "allorigins",
@@ -14,7 +21,7 @@ export const PROXIES = [
     id: "codetabs",
     label: "codetabs.com",
     build: (url) =>
-      `https://api.codetabs.com/v1/proxy/?quest=${encodeURIComponent(url)}`,
+      `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
   },
   {
     id: "direct",
