@@ -16,19 +16,25 @@ whole thing — every chapter — in calm, adjustable typography. Built as a
 
 GitHub Pages serves only static files — there is **no backend server**. So the
 story is fetched **in your browser**. Because source sites don't send CORS
-headers, the request is routed through a public CORS proxy
-([AllOrigins](https://allorigins.win/)).
+headers, the request is routed through a public CORS proxy. There's no
+picker for this — the app tries a short list of proxies automatically
+(currently AllOrigins, corsproxy.io, codetabs.com) and falls through to the
+next one if a proxy is down, rate-limited, or returns a Cloudflare challenge
+page, so a single proxy having a bad moment usually isn't visible to you.
 
 Two consequences to be aware of:
 
-1. **The proxy is unreliable.** Public CORS proxies get rate-limited or go
-   down. If a load fails, it's usually transient — try again in a moment.
+1. **Proxies are unreliable.** Public CORS proxies get rate-limited or go
+   down. The automatic fallback covers most of this, but if every proxy in
+   the list fails at once, the error message lists what each one reported.
 2. **Bot protection.** fanfiction.net sits behind Cloudflare, which sometimes
-   serves a challenge page instead of the story. When that happens you'll get
-   a clear "Cloudflare challenge page" error — try again later.
+   serves a challenge page instead of the real content — this happens more
+   often on `/search/` than on individual story pages. A proxy can't solve a
+   JS challenge, so this counts as a failure and triggers the same fallback;
+   if it happens on every proxy, try again later.
 
 A small, self-hosted proxy (e.g. a Cloudflare Worker) is the most reliable
-long-term option; the public proxy is a zero-setup default.
+long-term option; the public proxies are a zero-setup default.
 
 ## Features
 
