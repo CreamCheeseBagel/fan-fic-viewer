@@ -11,6 +11,10 @@ import { dirname, join, extname } from "node:path";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const fixture = readFileSync(join(root, "tests/fixtures/fanfiction-sample.html"), "utf8");
+const realFixture = readFileSync(
+  join(root, "tests/fixtures/fanfiction-real-chapter.html"),
+  "utf8"
+);
 
 const TYPES = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css" };
 
@@ -35,14 +39,23 @@ page.on("pageerror", (e) => console.log("  [pageerror]", e.message));
 
 await page.goto(`http://localhost:${port}/`);
 
-const result = await page.evaluate(async (html) => {
-  const { adapterFor, toDocument } = await import("/js/sites/index.js");
-  const url = "https://www.fanfiction.net/s/1234567/2/The-Test-Chronicles";
-  const adapter = adapterFor(url);
-  const info = adapter.normalizeUrl(url);
-  const meta = adapter.parse(toDocument(html), info);
-  return { info, meta };
-}, fixture);
+async function parseFixture(html, url) {
+  return page.evaluate(
+    async ({ html, url }) => {
+      const { adapterFor, toDocument } = await import("/js/sites/index.js");
+      const adapter = adapterFor(url);
+      const info = adapter.normalizeUrl(url);
+      const meta = adapter.parse(toDocument(html), info);
+      return { info, meta };
+    },
+    { html, url }
+  );
+}
+
+const result = await parseFixture(
+  fixture,
+  "https://www.fanfiction.net/s/1234567/2/The-Test-Chronicles"
+);
 
 const m = result.meta;
 const checks = [
@@ -59,6 +72,23 @@ const checks = [
   ["inline formatting preserved", /<em>world<\/em>/.test(m.chapterHtml)],
   ["disallowed tag unwrapped", !/<table/.test(m.chapterHtml) && /unwrap me/.test(m.chapterHtml)],
 ];
+
+// Real fanfiction.net markup: no .xcontact class on the title <b>, unclosed
+// <option> tags, and a profile_top full of unrelated xcontrast_txt elements
+// the summary selector must skip past.
+const realResult = await parseFixture(
+  realFixture,
+  "https://www.fanfiction.net/s/11029690/4/The-Doctor-Who-Drabble-Files"
+);
+const rm = realResult.meta;
+checks.push(
+  ["real: title", rm.title === "The Doctor Who Drabble Files"],
+  ["real: author", rm.author === "badly-knitted"],
+  ["real: summary", rm.summary.startsWith("My third drabble collection")],
+  ["real: chapterCount", rm.chapterCount === 5],
+  ["real: chapter parsed from url", realResult.info.chapter === 4],
+  ["real: story text extracted", /Travelling with the Doctor/.test(rm.chapterHtml)]
+);
 
 let ok = true;
 for (const [name, pass] of checks) {
