@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fan Fic Viewer</title>
+  <meta name="description" content="Read fanfiction.net stories in a clean, distraction-free format." />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="wrap">
+      <a class="brand" href="./">Fan Fic Viewer</a>
+      <form id="load-form" class="load-form" autocomplete="off">
+        <input
+          id="url-input"
+          type="text"
+          inputmode="url"
+          placeholder="Paste a fanfiction.net story URL…"
+          aria-label="Story URL"
+        />
+        <button type="submit" id="load-btn">Read</button>
+      </form>
+    </div>
+  </header>
+
+  <main class="wrap" id="main">
+    <section id="intro" class="intro">
+      <h1>Read fanfiction in a clean format</h1>
+      <p>
+        Paste a <code>fanfiction.net</code> story link above to load the whole
+        story — every chapter — in a calm, readable layout. Your reading
+        settings and the last URL are remembered in your browser.
+      </p>
+      <p class="muted small">
+        Because this is a static site with no server, stories are fetched in
+        your browser through a public CORS proxy. If a load fails, try a
+        different proxy in <button type="button" class="linkish" id="open-settings-intro">settings</button>.
+      </p>
+    </section>
+
+    <section id="status" class="status" hidden></section>
+
+    <article id="story" class="story" hidden>
+      <div class="story-meta">
+        <h1 id="story-title"></h1>
+        <p id="story-author" class="muted"></p>
+        <p id="story-summary" class="summary"></p>
+      </div>
+
+      <nav class="chapter-nav" aria-label="Chapter navigation">
+        <button type="button" id="prev-chapter">‹ Prev</button>
+        <select id="chapter-select" aria-label="Select chapter"></select>
+        <button type="button" id="next-chapter">Next ›</button>
+      </nav>
+
+      <div id="chapter-content" class="chapter-content"></div>
+
+      <nav class="chapter-nav bottom" aria-label="Chapter navigation">
+        <button type="button" id="prev-chapter-2">‹ Prev</button>
+        <button type="button" id="next-chapter-2">Next ›</button>
+      </nav>
+    </article>
+  </main>
+
+  <div id="settings-panel" class="settings-panel" hidden>
+    <div class="settings-inner">
+      <h2>Reading settings</h2>
+      <label>
+        Font size
+        <input type="range" id="font-size" min="14" max="28" step="1" />
+      </label>
+      <label>
+        Line height
+        <input type="range" id="line-height" min="14" max="24" step="1" />
+      </label>
+      <label>
+        Theme
+        <select id="theme-select">
+          <option value="light">Light</option>
+          <option value="sepia">Sepia</option>
+          <option value="dark">Dark</option>
+        </select>
+      </label>
+      <label>
+        CORS proxy
+        <select id="proxy-select"></select>
+      </label>
+      <button type="button" id="close-settings">Done</button>
+    </div>
+  </div>
+
+  <button type="button" id="settings-toggle" class="settings-toggle" aria-label="Settings">⚙</button>
+
+  <footer class="site-footer wrap">
+    <p class="muted small">
+      Fan Fic Viewer is an unofficial reader. Content belongs to its original
+      authors on the source sites.
+    </p>
+  </footer>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

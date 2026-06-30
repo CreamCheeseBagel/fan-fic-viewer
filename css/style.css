@@ -1,0 +1,229 @@
+:root {
+  --bg: #ffffff;
+  --fg: #1a1a1a;
+  --muted: #6b6b6b;
+  --accent: #4a6fa5;
+  --border: #e2e2e2;
+  --panel: #f7f7f7;
+  --reader-font-size: 19px;
+  --reader-line-height: 1.7;
+}
+
+[data-theme="sepia"] {
+  --bg: #f4ecd8;
+  --fg: #3a2f1c;
+  --muted: #7a6c52;
+  --accent: #8a5a2b;
+  --border: #e0d4b8;
+  --panel: #efe6cf;
+}
+
+[data-theme="dark"] {
+  --bg: #16181c;
+  --fg: #d8d8d8;
+  --muted: #8a8f98;
+  --accent: #7aa2d6;
+  --border: #2a2e35;
+  --panel: #1d2025;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.wrap {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+.site-header {
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  background: var(--bg);
+  z-index: 10;
+}
+
+.site-header .wrap {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding-top: 12px;
+  padding-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.brand {
+  font-weight: 700;
+  color: var(--fg);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.load-form {
+  display: flex;
+  flex: 1;
+  gap: 8px;
+  min-width: 240px;
+}
+
+.load-form input {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--fg);
+  font-size: 15px;
+}
+
+button {
+  cursor: pointer;
+  font-size: 15px;
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--accent);
+  color: #fff;
+  transition: opacity 0.15s ease;
+}
+
+button:hover { opacity: 0.9; }
+button:disabled { opacity: 0.5; cursor: default; }
+
+.chapter-nav button,
+#close-settings {
+  background: var(--panel);
+  color: var(--fg);
+}
+
+.linkish {
+  background: none;
+  border: none;
+  color: var(--accent);
+  padding: 0;
+  text-decoration: underline;
+  font-size: inherit;
+}
+
+.intro { padding: 48px 0; }
+.intro h1 { font-size: 28px; margin-top: 0; }
+
+.muted { color: var(--muted); }
+.small { font-size: 13px; }
+
+code {
+  background: var(--panel);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 0.9em;
+}
+
+.status {
+  margin: 32px 0;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+}
+.status.error { border-color: #c0392b; color: #c0392b; }
+
+.story { padding: 32px 0 64px; }
+.story-meta h1 { font-size: 26px; margin-bottom: 4px; }
+.summary { font-style: italic; margin-top: 12px; }
+
+.chapter-nav {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 24px 0;
+}
+.chapter-nav select {
+  flex: 1;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--fg);
+}
+.chapter-nav.bottom { justify-content: space-between; }
+
+.chapter-content {
+  font-size: var(--reader-font-size);
+  line-height: var(--reader-line-height);
+}
+.chapter-content p { margin: 0 0 1.1em; }
+.chapter-content hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 2em 0;
+}
+
+.settings-toggle {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  font-size: 20px;
+  background: var(--accent);
+  z-index: 20;
+}
+
+.settings-panel {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 30;
+}
+.settings-inner {
+  background: var(--bg);
+  color: var(--fg);
+  padding: 24px;
+  border-radius: 12px;
+  width: min(360px, 90vw);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.settings-inner h2 { margin: 0; font-size: 18px; }
+.settings-inner label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 14px;
+}
+.settings-inner select,
+.settings-inner input[type="range"] { width: 100%; }
+
+.site-footer {
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+  padding-bottom: 32px;
+  margin-top: 32px;
+}
+
+.spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--muted);
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  vertical-align: middle;
+  margin-right: 8px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }

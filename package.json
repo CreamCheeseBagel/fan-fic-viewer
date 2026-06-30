@@ -1,0 +1,14 @@
+{
+  "name": "fan-fic-viewer",
+  "version": "0.1.0",
+  "description": "A clean, static-site reader for fanfiction (fanfiction.net and more).",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "serve": "python3 -m http.server 8000",
+    "test": "node tests/parser.test.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.56.1"
+  }
+}
