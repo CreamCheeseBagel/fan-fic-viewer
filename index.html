@@ -16,11 +16,10 @@
         <input
           id="url-input"
           type="text"
-          inputmode="url"
-          placeholder="Paste a fanfiction.net story URL…"
-          aria-label="Story URL"
+          placeholder="Paste a story URL, or search by keyword…"
+          aria-label="Story URL or search keywords"
         />
-        <button type="submit" id="load-btn">Read</button>
+        <button type="submit" id="load-btn">Go</button>
       </form>
     </div>
   </header>
@@ -30,8 +29,9 @@
       <h1>Read fanfiction in a clean format</h1>
       <p>
         Paste a <code>fanfiction.net</code> story link above to load the whole
-        story — every chapter — in a calm, readable layout. Your reading
-        settings and the last URL are remembered in your browser.
+        story — every chapter — in a calm, readable layout. Or type a few
+        keywords to search for a story instead. Your reading settings and the
+        last URL are remembered in your browser.
       </p>
       <p class="muted small">
         Because this is a static site with no server, stories are fetched in
@@ -41,6 +41,8 @@
     </section>
 
     <section id="status" class="status" hidden></section>
+
+    <section id="search-results" class="search-results" hidden></section>
 
     <article id="story" class="story" hidden>
       <div class="story-meta">
