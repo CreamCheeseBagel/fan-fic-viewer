@@ -74,5 +74,20 @@ async function fetchViaProxy(url, proxy) {
   if (!text || text.length < 200) {
     throw new Error("empty/short response");
   }
+  if (isCloudflareChallenge(text)) {
+    throw new Error("blocked by a Cloudflare challenge page");
+  }
   return text;
+}
+
+// fanfiction.net sits behind Cloudflare and sometimes returns a "Just a
+// moment..." interstitial (HTTP 200, real HTML, but no actual content)
+// instead of the requested page. A proxy can't solve a JS challenge, so
+// treat this as a failure and let fetchHtml retry through another proxy -
+// a different exit IP is the only thing that might dodge it.
+export function isCloudflareChallenge(text) {
+  return (
+    /<title>\s*Just a moment/i.test(text) &&
+    /cf_chl_opt|challenge-platform/i.test(text)
+  );
 }
