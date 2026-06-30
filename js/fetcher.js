@@ -29,12 +29,22 @@ export async function fetchHtml(url) {
     try {
       return await fetchViaProxy(url, proxy);
     } catch (err) {
-      errors.push(`${proxy.label}: ${err.message}`);
+      errors.push({ label: proxy.label, message: err.message, isChallenge: !!err.isChallenge });
     }
   }
 
+  if (errors.length && errors.every((e) => e.isChallenge)) {
+    throw new Error(
+      "fanfiction.net's Cloudflare protection is blocking every available proxy right now " +
+        "(this happens more often on search than on individual story pages, since search " +
+        "responses can't be cached). No request-layer trick gets around this - it's not a " +
+        "bug, just bot detection working as designed. Try again in a few minutes, or load a " +
+        "story directly by its URL if you have one."
+    );
+  }
+
   throw new Error(
-    `All proxies failed:\n${errors.join("\n")}\n` +
+    `All proxies failed:\n${errors.map((e) => `${e.label}: ${e.message}`).join("\n")}\n` +
       `The source may be blocking proxies right now. Try again later.`
   );
 }
@@ -58,7 +68,9 @@ async function fetchViaProxy(url, proxy) {
     throw new Error("empty/short response");
   }
   if (isCloudflareChallenge(text)) {
-    throw new Error("blocked by a Cloudflare challenge page");
+    const err = new Error("blocked by a Cloudflare challenge page");
+    err.isChallenge = true;
+    throw err;
   }
   return text;
 }
