@@ -1,4 +1,4 @@
-import { fetchHtml, PROXIES } from "./fetcher.js";
+import { fetchHtml } from "./fetcher.js";
 import { adapterFor, searchAdapters, toDocument } from "./sites/index.js";
 
 const SETTINGS_KEY = "ffv:settings";
@@ -8,7 +8,6 @@ const DEFAULT_SETTINGS = {
   fontSize: 19,
   lineHeight: 17,
   theme: "light",
-  proxy: PROXIES[0].id,
 };
 
 const els = {
@@ -34,8 +33,6 @@ const els = {
   fontSize: document.getElementById("font-size"),
   lineHeight: document.getElementById("line-height"),
   themeSelect: document.getElementById("theme-select"),
-  proxySelect: document.getElementById("proxy-select"),
-  openSettingsIntro: document.getElementById("open-settings-intro"),
 };
 
 let settings = loadSettings();
@@ -60,17 +57,6 @@ function applySettings() {
   els.fontSize.value = settings.fontSize;
   els.lineHeight.value = settings.lineHeight;
   els.themeSelect.value = settings.theme;
-  els.proxySelect.value = settings.proxy;
-}
-
-function initProxyOptions() {
-  els.proxySelect.innerHTML = "";
-  for (const p of PROXIES) {
-    const opt = document.createElement("option");
-    opt.value = p.id;
-    opt.textContent = p.label;
-    els.proxySelect.appendChild(opt);
-  }
 }
 
 function showStatus(html, isError = false) {
@@ -103,7 +89,7 @@ async function loadStory(url) {
 
   try {
     const firstUrl = adapter.chapterUrl(info, info.chapter || 1);
-    const html = await fetchHtml(firstUrl, settings.proxy);
+    const html = await fetchHtml(firstUrl);
     const doc = toDocument(html);
     const meta = adapter.parse(doc, info);
 
@@ -157,7 +143,7 @@ async function runSearch(keywords) {
 
 async function loadSearchPage() {
   const { adapter, keywords, page } = activeSearch;
-  const html = await fetchHtml(adapter.searchUrl(keywords, page), settings.proxy);
+  const html = await fetchHtml(adapter.searchUrl(keywords, page));
   const doc = toDocument(html);
   const results = adapter.parseSearchResults(doc);
   renderSearchResults(results, page === 1);
@@ -247,7 +233,7 @@ async function showChapter(n) {
   if (html == null) {
     showStatus(`<span class="spinner"></span>Loading chapter ${n}…`);
     try {
-      const raw = await fetchHtml(adapter.chapterUrl(info, n), settings.proxy);
+      const raw = await fetchHtml(adapter.chapterUrl(info, n));
       const parsed = adapter.parse(toDocument(raw), info);
       html = parsed.chapterHtml;
       chapterCache.set(n, html);
@@ -309,13 +295,11 @@ function openSettings() { els.settingsPanel.hidden = false; }
 function closeSettings() { els.settingsPanel.hidden = true; }
 els.settingsToggle.addEventListener("click", openSettings);
 els.closeSettings.addEventListener("click", closeSettings);
-els.openSettingsIntro.addEventListener("click", openSettings);
 els.settingsPanel.addEventListener("click", (e) => { if (e.target === els.settingsPanel) closeSettings(); });
 
 els.fontSize.addEventListener("input", (e) => { settings.fontSize = parseInt(e.target.value, 10); applySettings(); saveSettings(); });
 els.lineHeight.addEventListener("input", (e) => { settings.lineHeight = parseInt(e.target.value, 10); applySettings(); saveSettings(); });
 els.themeSelect.addEventListener("change", (e) => { settings.theme = e.target.value; applySettings(); saveSettings(); });
-els.proxySelect.addEventListener("change", (e) => { settings.proxy = e.target.value; saveSettings(); });
 
 function escapeHtml(s) {
   const d = document.createElement("div");
@@ -323,7 +307,6 @@ function escapeHtml(s) {
   return d.innerHTML;
 }
 
-initProxyOptions();
 applySettings();
 
 const lastUrl = localStorage.getItem(LAST_URL_KEY);

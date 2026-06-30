@@ -1,81 +1,36 @@
 // Fetching helpers for a static (no-backend) site.
 //
 // fanfiction.net does not send CORS headers, so the browser cannot fetch it
-// directly. We route requests through a public CORS proxy. Proxies come and go
-// and may be rate-limited or blocked by the source's bot protection, so the
-// proxy is user-selectable in settings.
+// directly. We route requests through a public CORS proxy (AllOrigins).
 
-export const PROXIES = [
-  {
-    id: "allorigins",
-    label: "AllOrigins (raw)",
-    build: (url) =>
-      `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-  },
-  {
-    id: "corsproxy",
-    label: "corsproxy.io",
-    build: (url) => `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
-  },
-  {
-    id: "codetabs",
-    label: "codetabs.com",
-    build: (url) =>
-      `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
-  },
-  {
-    id: "direct",
-    label: "Direct (no proxy)",
-    build: (url) => url,
-  },
-];
+const PROXY_BASE = "https://api.allorigins.win/raw?url=";
 
-export function getProxy(id) {
-  return PROXIES.find((p) => p.id === id) || PROXIES[0];
-}
-
-// Tries the chosen proxy first, then falls back through the rest — public
-// proxies are flaky and occasionally return 500s, so a single failure
-// shouldn't block the read.
-export async function fetchHtml(url, proxyId) {
-  const preferred = getProxy(proxyId);
-  const ordered = [preferred, ...PROXIES.filter((p) => p.id !== preferred.id)];
-
-  const errors = [];
-  for (const proxy of ordered) {
-    try {
-      return await fetchViaProxy(url, proxy);
-    } catch (err) {
-      errors.push(`${proxy.label}: ${err.message}`);
-    }
-  }
-
-  throw new Error(
-    `All proxies failed:\n${errors.join("\n")}\n` +
-      `The source may be blocking proxies right now. Try again later.`
-  );
-}
-
-async function fetchViaProxy(url, proxy) {
-  const target = proxy.build(url);
+export async function fetchHtml(url) {
+  const target = `${PROXY_BASE}${encodeURIComponent(url)}`;
 
   let res;
   try {
     res = await fetch(target, { headers: { Accept: "text/html,*/*" } });
   } catch (err) {
-    throw new Error(`network error (${err.message})`);
+    throw new Error(
+      `Network error reaching the proxy. It may be down or blocked right now. (${err.message})`
+    );
   }
 
   if (!res.ok) {
-    throw new Error(`HTTP ${res.status}`);
+    throw new Error(`Proxy returned HTTP ${res.status}. Try again in a moment.`);
   }
 
   const text = await res.text();
   if (!text || text.length < 200) {
-    throw new Error("empty/short response");
+    throw new Error(
+      "Got an empty/short response. The source may be blocking the proxy right now."
+    );
   }
   if (isCloudflareChallenge(text)) {
-    throw new Error("blocked by a Cloudflare challenge page");
+    throw new Error(
+      "fanfiction.net is showing a Cloudflare challenge page right now. Try again in a moment."
+    );
   }
   return text;
 }
@@ -83,8 +38,7 @@ async function fetchViaProxy(url, proxy) {
 // fanfiction.net sits behind Cloudflare and sometimes returns a "Just a
 // moment..." interstitial (HTTP 200, real HTML, but no actual content)
 // instead of the requested page. A proxy can't solve a JS challenge, so
-// treat this as a failure and let fetchHtml retry through another proxy -
-// a different exit IP is the only thing that might dodge it.
+// treat this as a failure rather than silently parsing the interstitial.
 export function isCloudflareChallenge(text) {
   return (
     /<title>\s*Just a moment/i.test(text) &&
