@@ -7,6 +7,11 @@ whole thing — every chapter — in calm, adjustable typography. Built as a
 > Unofficial reader. All story content belongs to its original authors on the
 > source sites.
 
+See [`docs/SPEC.md`](docs/SPEC.md) for the full functional specification,
+including known problems and limitations (CORS proxy reliability,
+Cloudflare bot protection, markup fragility, and more) — read it before
+filing an issue that turns out to be one of those.
+
 ## Supported sites
 
 - ✅ **fanfiction.net**
