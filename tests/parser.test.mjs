@@ -166,7 +166,13 @@ checks.push(
 
 // fetchHtml's proxy-aggregation error messages, exercised via mocked network
 // responses (no real internet access in this environment, and these
-// branches aren't reachable through the DOM-fixture tests above).
+// branches aren't reachable through the DOM-fixture tests above). fetchHtml
+// uses the real default chain, which now includes the configured self-hosted
+// Worker as the first entry - mock its domain too, or this test would issue
+// a real network request to it.
+await page.route("**workers.dev**", (route) =>
+  route.fulfill({ status: 200, contentType: "text/html", body: cloudflareFixture })
+);
 await page.route("**allorigins.win**", (route) =>
   route.fulfill({ status: 200, contentType: "text/html", body: cloudflareFixture })
 );
@@ -213,6 +219,7 @@ checks.push([
     /corsproxy\.io: blocked by a Cloudflare/.test(mixedMessage || ""),
 ]);
 
+await page.unroute("**workers.dev**");
 await page.unroute("**allorigins.win**");
 await page.unroute("**corsproxy.io**");
 await page.unroute("**codetabs.com**");

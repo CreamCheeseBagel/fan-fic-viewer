@@ -20,7 +20,7 @@
 // appended url-encoded - e.g. "https://fanfic-proxy.you.workers.dev/?url=".
 // Leave empty to use public proxies only (the default, zero-setup behavior).
 // See worker/README.md to deploy one in a couple of minutes.
-const CUSTOM_PROXY = "";
+const CUSTOM_PROXY = "https://divine-disk-4afc.kimmelan.workers.dev/?url=";
 
 const PUBLIC_PROXIES = [
   {
