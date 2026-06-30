@@ -217,6 +217,32 @@ await page.unroute("**allorigins.win**");
 await page.unroute("**corsproxy.io**");
 await page.unroute("**codetabs.com**");
 
+// Proxy chain ordering: a configured self-hosted proxy is tried first, with
+// the public proxies kept as fallback; with none configured the chain is the
+// public proxies unchanged.
+const chainCheck = await page.evaluate(async () => {
+  const { buildProxyChain } = await import("/js/fetcher.js");
+  const withCustom = buildProxyChain("https://w.example/?url=");
+  const without = buildProxyChain("");
+  return {
+    customFirstLabel: withCustom[0].label,
+    customFirstUrl: withCustom[0].build("https://www.fanfiction.net/s/1/1/x"),
+    customLen: withCustom.length,
+    defaultLen: without.length,
+    defaultFirstLabel: without[0].label,
+  };
+});
+checks.push(
+  ["proxy chain: self-hosted tried first when configured", chainCheck.customFirstLabel === "self-hosted"],
+  [
+    "proxy chain: self-hosted builds url-encoded target",
+    chainCheck.customFirstUrl ===
+      "https://w.example/?url=https%3A%2F%2Fwww.fanfiction.net%2Fs%2F1%2F1%2Fx",
+  ],
+  ["proxy chain: self-hosted prepended to public fallbacks", chainCheck.customLen === chainCheck.defaultLen + 1],
+  ["proxy chain: default chain unchanged with no custom proxy", chainCheck.defaultFirstLabel === "AllOrigins"]
+);
+
 let ok = true;
 for (const [name, pass] of checks) {
   console.log(`${pass ? "PASS" : "FAIL"} ${name}`);
