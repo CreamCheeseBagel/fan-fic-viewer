@@ -15,6 +15,10 @@ const realFixture = readFileSync(
   join(root, "tests/fixtures/fanfiction-real-chapter.html"),
   "utf8"
 );
+const singleChapterFixture = readFileSync(
+  join(root, "tests/fixtures/fanfiction-single-chapter.html"),
+  "utf8"
+);
 const searchFixture = readFileSync(
   join(root, "tests/fixtures/fanfiction-search-results.html"),
   "utf8"
@@ -97,6 +101,25 @@ checks.push(
   ["real: chapterCount", rm.chapterCount === 5],
   ["real: chapter parsed from url", realResult.info.chapter === 4],
   ["real: story text extracted", /Travelling with the Doctor/.test(rm.chapterHtml)]
+);
+
+// Real one-shot story with no #chap_select at all (most multi-chapter
+// fixtures have one) - confirms parse() falls back to a single chapter
+// instead of assuming the dropdown is always present.
+const oneShotResult = await parseFixture(
+  singleChapterFixture,
+  "https://www.fanfiction.net/s/3693839/1/MEGATRON-VS-THE-RABBOT"
+);
+const om = oneShotResult.meta;
+checks.push(
+  ["one-shot: title", om.title === "MEGATRON VS THE RABBOT"],
+  ["one-shot: author", om.author === "Thunderstarwarp"],
+  ["one-shot: summary", om.summary.startsWith("When the Rabbot returns")],
+  ["one-shot: chapterCount falls back to 1", om.chapterCount === 1],
+  ["one-shot: chapterTitles falls back to [title]", JSON.stringify(om.chapterTitles) === JSON.stringify([om.title])],
+  ["one-shot: hr preserved", /<hr>/.test(om.chapterHtml)],
+  ["one-shot: align attr stripped", !/align=/.test(om.chapterHtml)],
+  ["one-shot: br preserved", /<br>/.test(om.chapterHtml)]
 );
 
 // Real fanfiction.net search-results markup: confirms .z-padtop2 (not
